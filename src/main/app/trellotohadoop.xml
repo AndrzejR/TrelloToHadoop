@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:tracking="http://www.mulesoft.org/schema/mule/ee/tracking" xmlns:json="http://www.mulesoft.org/schema/mule/json" xmlns:hdfs="http://www.mulesoft.org/schema/mule/hdfs" xmlns:http="http://www.mulesoft.org/schema/mule/http" xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+	xmlns:spring="http://www.springframework.org/schema/beans" 
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-current.xsd
+http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd
+http://www.mulesoft.org/schema/mule/json http://www.mulesoft.org/schema/mule/json/current/mule-json.xsd
+http://www.mulesoft.org/schema/mule/hdfs http://www.mulesoft.org/schema/mule/hdfs/current/mule-hdfs.xsd
+http://www.mulesoft.org/schema/mule/ee/tracking http://www.mulesoft.org/schema/mule/ee/tracking/current/mule-tracking-ee.xsd">
+    <http:listener-config name="HTTP_Listener_Configuration" host="0.0.0.0" port="8081" doc:name="HTTP Listener Configuration"/>
+    <http:request-config name="HTTP_Request_Configuration" host="api.trello.com" port="80" basePath="/1" doc:name="HTTP Request Configuration"/>
+    <hdfs:config name="HDFS__Simple_Configuration" nameNodeUri="hdfs://localhost:9000/" doc:name="HDFS: Simple Configuration"/>
+    <flow name="TrelloToHadoopFlow">
+        <poll doc:name="Poll">
+            <fixed-frequency-scheduler frequency="${poll.frequency_seconds}" timeUnit="SECONDS"/>
+            <http:request config-ref="HTTP_Request_Configuration" path="boards/${trello.board}/cards" method="GET" doc:name="REST_Trello">
+                <http:request-builder>
+                    <http:query-param paramName="key" value="${trello.apikey}"/>
+                    <http:query-param paramName="token" value="${trello.token}"/>
+                </http:request-builder>
+            </http:request>
+        </poll>
+        <byte-array-to-string-transformer doc:name="Byte Array to String"/>
+        <set-variable variableName="CurrentDateTime" value="#[server.dateTime.format(&quot;yyyyMMdd_HHmmss&quot;)]" doc:name="Variable"/>
+        <logger message="Writing: ${hdfs.filepath}_#[flowVars.CurrentDateTime].txt" level="INFO" doc:name="Logger"/>
+        <hdfs:write config-ref="HDFS__Simple_Configuration" path="${hdfs.filepath}_#[flowVars.CurrentDateTime].txt" doc:name="HDFS"/>
+        <logger message="Done!" level="INFO" doc:name="Logger"/>
+    </flow>
+</mule>
